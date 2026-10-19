@@ -5,7 +5,7 @@ from telegram import Update
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
 import imageio_ffmpeg
 
-# --- 1. PORT FIX - Ei part ta add korechi jate Render e No open ports error na ase ---
+# --- PORT FIX for Render ---
 web_app = Flask(__name__)
 @web_app.route('/')
 def home():
@@ -35,7 +35,6 @@ async def handle_video(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
             await msg.edit_text("⚙️ Transcoding 1080p 60fps 10Mbps H.264...")
 
-            # 1080p + 60fps + 10Mbps + H.264
             proc = await asyncio.create_subprocess_exec(
                 ffmpeg_path, "-y", "-i", input_path,
                 "-vf", "scale=-2:1080,fps=60",
