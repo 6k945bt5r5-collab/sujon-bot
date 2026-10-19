@@ -1,5 +1,4 @@
 import os
-import asyncio
 import threading
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from telegram import Update
@@ -38,7 +37,6 @@ async def handle_video(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         await update.message.reply_text("⚙️ Transcoding 1080p 60fps 10Mbps H.264...")
 
-        # Sujon HD 1080p 60fps 10Mbps H.264
         ffmpeg_exe = imageio_ffmpeg.get_ffmpeg_exe()
         cmd = [
             ffmpeg_exe, "-i", in_path,
