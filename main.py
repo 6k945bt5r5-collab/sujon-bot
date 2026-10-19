@@ -1,43 +1,55 @@
 import os
-import subprocess
+import asyncio
+import threading
+from http.server import BaseHTTPRequestHandler, HTTPServer
 from telegram import Update
-from telegram.ext import ApplicationBuilder, MessageHandler, CommandHandler, ContextTypes, filters
+from telegram.ext import ApplicationBuilder, MessageHandler, filters, ContextTypes
+import subprocess
+import tempfile
 
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("👋 Sujon HD Transcoder Ready!\nVideo pathao, ami 1080p 60fps 10Mbps H.264 file baniye debo.")
+# --- Render ke khushi korar jonno fake web server ---
+class Handler(BaseHTTPRequestHandler):
+    def do_GET(self):
+        self.send_response(200)
+        self.end_headers()
+        self.wfile.write(b"Sujon HD Bot is Running!")
+
+def run_web():
+    port = int(os.environ.get("PORT", 10000))
+    server = HTTPServer(('0.0.0.0', port), Handler)
+    server.serve_forever()
+
+threading.Thread(target=run_web, daemon=True).start()
+# --- Fake server sesh ---
 
 async def handle_video(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    msg = await update.message.reply_text("⏳ Downloading...")
-    try:
-        file = await update.message.effective_attachment.get_file()
-        input_path = "/tmp/input"
-        output_path = "/tmp/output.mp4"
-        await file.download_to_drive(input_path)
-        await msg.edit_text("⚙️ Transcoding 1080p 60fps 10Mbps H.264...")
-
-        cmd = ["ffmpeg","-y","-i",input_path,"-vf","scale=1920:1080:force_original_aspect_ratio=decrease,pad=1920:1080:(ow-iw)/2:(oh-ih)/2:color=black,fps=60","-r","60","-c:v","libx264","-preset","fast","-b:v","10M","-maxrate","10M","-bufsize","20M","-pix_fmt","yuv420p","-c:a","aac","-b:a","128k","-movflags","+faststart",output_path]
-        subprocess.run(cmd, check=True)
-        await msg.edit_text("📤 Uploading as file...")
+    await update.message.reply_text("⏳ Downloading...")
+    file = await context.bot.get_file(update.message.video or update.message.document)
+    with tempfile.TemporaryDirectory() as tmp:
+        in_path = os.path.join(tmp, "input.mp4")
+        out_path = os.path.join(tmp, "output.mp4")
+        await file.download_to_drive(in_path)
         
-        with open(output_path, 'rb') as f:
-            await update.message.reply_document(
-                document=f,
-                filename="1080p_60fps_10Mbps_H264.mp4",
-                caption="✅ Done: 1080p | 60fps | 10Mbps | H.264\nFile hisabe save koren"
-            )
-        await msg.delete()
-        os.remove(input_path)
-        os.remove(output_path)
-    except Exception as e:
-        await msg.edit_text(f"❌ Error: {e}")
-
-def main():
-    app = ApplicationBuilder().token(BOT_TOKEN).build()
-    app.add_handler(CommandHandler("start", start))
-    app.add_handler(MessageHandler(filters.VIDEO | filters.Document.VIDEO, handle_video))
-    app.run_polling()
+        await update.message.reply_text("⚙️ Transcoding 1080p 60fps 10Mbps H.264...")
+        
+        # Sujon HD 1080p 60fps 10Mbps H.264
+        cmd = [
+            "ffmpeg", "-i", in_path,
+            "-vf", "scale=1920:1080:flags=lanczos",
+            "-r", "60",
+            "-c:v", "libx264", "-profile:v", "high", "-preset", "medium", "-b:v", "10M", "-maxrate", "10M", "-bufsize", "20M",
+            "-pix_fmt", "yuv420p",
+            "-c:a", "aac", "-b:a", "192k",
+            out_path
+        ]
+        subprocess.run(cmd, check=True)
+        await update.message.reply_text("📤 Uploading as file...")
+        await context.bot.send_document(chat_id=update.effective_chat.id, document=open(out_path, 'rb'))
 
 if __name__ == "__main__":
-    main()
+    print("Sujon HD Bot Started - 1080p 60fps 10Mbps")
+    app = ApplicationBuilder().token(BOT_TOKEN).build()
+    app.add_handler(MessageHandler(filters.VIDEO | filters.Document.VIDEO, handle_video))
+    app.run_polling()
