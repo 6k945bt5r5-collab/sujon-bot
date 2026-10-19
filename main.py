@@ -1,7 +1,22 @@
 import os, tempfile, asyncio
+from flask import Flask
+from threading import Thread
 from telegram import Update
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
 import imageio_ffmpeg
+
+# --- 1. PORT FIX - Ei part ta add korechi jate Render e No open ports error na ase ---
+web_app = Flask(__name__)
+@web_app.route('/')
+def home():
+    return "Sujon Bot is Live!"
+
+def run_web():
+    port = int(os.environ.get("PORT", 10000))
+    web_app.run(host='0.0.0.0', port=port)
+
+Thread(target=run_web, daemon=True).start()
+# --- END FIX ---
 
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 ffmpeg_path = imageio_ffmpeg.get_ffmpeg_exe()
@@ -17,9 +32,9 @@ async def handle_video(update: Update, context: ContextTypes.DEFAULT_TYPE):
             input_path = os.path.join(tmp, "input.mp4")
             output_path = os.path.join(tmp, "output.mp4")
             await file.download_to_drive(input_path)
-            
+
             await msg.edit_text("⚙️ Transcoding 1080p 60fps 10Mbps H.264...")
-            
+
             # 1080p + 60fps + 10Mbps + H.264
             proc = await asyncio.create_subprocess_exec(
                 ffmpeg_path, "-y", "-i", input_path,
@@ -32,7 +47,7 @@ async def handle_video(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 output_path
             )
             await proc.communicate()
-            
+
             await msg.edit_text("⬆️ Uploading...")
             await update.message.reply_video(video=open(output_path, 'rb'), caption="✅ 1080p 60fps 10Mbps H.264 Done")
             await msg.delete()
