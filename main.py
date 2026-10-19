@@ -6,6 +6,7 @@ from telegram import Update
 from telegram.ext import ApplicationBuilder, MessageHandler, filters, ContextTypes
 import subprocess
 import tempfile
+import imageio_ffmpeg
 
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 
@@ -15,6 +16,9 @@ class Handler(BaseHTTPRequestHandler):
         self.send_response(200)
         self.end_headers()
         self.wfile.write(b"Sujon HD Bot is Running!")
+    def do_HEAD(self):
+        self.send_response(200)
+        self.end_headers()
 
 def run_web():
     port = int(os.environ.get("PORT", 10000))
@@ -31,12 +35,13 @@ async def handle_video(update: Update, context: ContextTypes.DEFAULT_TYPE):
         in_path = os.path.join(tmp, "input.mp4")
         out_path = os.path.join(tmp, "output.mp4")
         await file.download_to_drive(in_path)
-        
+
         await update.message.reply_text("⚙️ Transcoding 1080p 60fps 10Mbps H.264...")
-        
+
         # Sujon HD 1080p 60fps 10Mbps H.264
+        ffmpeg_exe = imageio_ffmpeg.get_ffmpeg_exe()
         cmd = [
-            "ffmpeg", "-i", in_path,
+            ffmpeg_exe, "-i", in_path,
             "-vf", "scale=1920:1080:flags=lanczos",
             "-r", "60",
             "-c:v", "libx264", "-profile:v", "high", "-preset", "medium", "-b:v", "10M", "-maxrate", "10M", "-bufsize", "20M",
